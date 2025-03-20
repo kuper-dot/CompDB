@@ -1,0 +1,20 @@
+{
+  "name": "competition-db-electron",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "electron": "^35.0.3",
+    "express": "^4.21.2",
+    "mysql2": "^3.14.0"
+  }
+  
+}
+

@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Competition DB Manager</title>
+</head>
+<body>
+    <h1>Teams</h1>
+    <ul id="team-list"></ul>
+
+    <h2>Add Team</h2>
+    <input type="text" id="team-name" placeholder="Enter team name">
+    <button onclick="addTeam()">Add Team</button>
+
+    <script>
+        async function fetchTeams() {
+            const response = await fetch("http://localhost:3000/teams");
+            const teams = await response.json();
+            const teamList = document.getElementById("team-list");
+            teamList.innerHTML = "";
+            teams.forEach(team => {
+                const li = document.createElement("li");
+                li.textContent = `${team.id}: ${team.name} (Comp ID: ${team.comp_id}, Score: ${team.score})`;
+                teamList.appendChild(li);
+            });
+        }
+
+        async function addTeam() {
+            const teamName = document.getElementById("team-name").value;
+            if (!teamName) return alert("Enter a team name");
+
+            const response = await fetch("http://localhost:3000/add-team", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ name: teamName })
+            });
+
+            if (response.ok) {
+                alert("Team added!");
+                fetchTeams();
+            } else {
+                alert("Error adding team");
+            }
+        }
+
+        fetchTeams();
+    </script>
+</body>
+</html>

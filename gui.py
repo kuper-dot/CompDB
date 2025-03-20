@@ -1,104 +1,131 @@
-import tkinter as tk
-from tkinter import messagebox, ttk
+from PyQt6.QtWidgets import QApplication, QWidget, QVBoxLayout, QPushButton, QLineEdit, QTableWidget, QTableWidgetItem, QTabWidget, QLabel, QMessageBox
+import sys
 import mysql.connector
 
 def connect_db():
-    return mysql.connector.connect(
-        host="192.168.0.113",
-        port=3306,
-        user="test",
-        password="123",
-        database="compDB"
-    )
-
-def fetch_teams():
     try:
-        conn = connect_db()
-        cursor = conn.cursor()
-        cursor.execute("SELECT id, name, comp_id, score FROM teams")
-        rows = cursor.fetchall()
-        conn.close()
-
-        for i in team_table.get_children():
-            team_table.delete(i)
-
-        for row in rows:
-            team_table.insert("", "end", values=row)
+        return mysql.connector.connect(
+            host="192.168.0.113",
+            port=3306,
+            user="test",
+            password="123",
+            database="compDB"
+        )
     except mysql.connector.Error as e:
-        messagebox.showerror("Database Error", str(e))
+        QMessageBox.critical(None, "Database Connection Error", str(e))
+        return None
 
-def add_team():
-    team_name = team_entry.get()
-    if not team_name:
-        messagebox.showwarning("Input Error", "Please enter a team name")
-        return
-    try:
+class CompetitionDBApp(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Competition DB Manager")
+        self.setGeometry(100, 100, 800, 500)
+        
+        layout = QVBoxLayout()
+        self.tabs = QTabWidget()
+        
+        self.team_tab = QWidget()
+        self.score_tab = QWidget()
+        
+        self.tabs.addTab(self.team_tab, "Teams")
+        self.tabs.addTab(self.score_tab, "Scores")
+        
+        layout.addWidget(self.tabs)
+        self.setLayout(layout)
+        
+        self.init_team_tab()
+        self.init_score_tab()
+    
+    def init_team_tab(self):
+        layout = QVBoxLayout()
+        
+        self.team_input = QLineEdit()
+        self.team_input.setPlaceholderText("Enter team name")
+        layout.addWidget(self.team_input)
+        
+        self.add_team_btn = QPushButton("Add Team")
+        self.add_team_btn.clicked.connect(self.add_team)
+        layout.addWidget(self.add_team_btn)
+        
+        self.load_team_btn = QPushButton("Load Teams")
+        self.load_team_btn.clicked.connect(self.fetch_teams)
+        layout.addWidget(self.load_team_btn)
+        
+        self.team_table = QTableWidget()
+        self.team_table.setColumnCount(4)
+        self.team_table.setHorizontalHeaderLabels(["ID", "Name", "Comp ID", "Score"])
+        layout.addWidget(self.team_table)
+        
+        self.team_tab.setLayout(layout)
+    
+    def init_score_tab(self):
+        layout = QVBoxLayout()
+        
+        self.load_scores_btn = QPushButton("Load Scores")
+        self.load_scores_btn.clicked.connect(self.fetch_scores)
+        layout.addWidget(self.load_scores_btn)
+        
+        self.score_table = QTableWidget()
+        self.score_table.setColumnCount(6)
+        self.score_table.setHorizontalHeaderLabels(["Team ID", "Player ID", "Game ID", "Points", "Created At", "Comment"])
+        layout.addWidget(self.score_table)
+        
+        self.score_tab.setLayout(layout)
+    
+    def fetch_teams(self):
         conn = connect_db()
-        cursor = conn.cursor()
-        cursor.execute("INSERT INTO teams (name, comp_id, created_at, score) VALUES (%s, 1, NOW(), 0)", (team_name,))
-        conn.commit()
-        conn.close()
-        messagebox.showinfo("Success", "Team added successfully!")
-        fetch_teams()
-    except mysql.connector.Error as e:
-        messagebox.showerror("Database Error", str(e))
-
-def fetch_scores():
-    try:
+        if conn is None:
+            return
+        try:
+            cursor = conn.cursor()
+            cursor.execute("SELECT id, name, comp_id, score FROM teams")
+            rows = cursor.fetchall()
+            conn.close()
+            
+            self.team_table.setRowCount(len(rows))
+            for row_idx, row in enumerate(rows):
+                for col_idx, data in enumerate(row):
+                    self.team_table.setItem(row_idx, col_idx, QTableWidgetItem(str(data)))
+        except mysql.connector.Error as e:
+            QMessageBox.critical(self, "Database Error", str(e))
+    
+    def add_team(self):
+        team_name = self.team_input.text().strip()
+        if not team_name:
+            QMessageBox.warning(self, "Input Error", "Please enter a team name.")
+            return
+        
         conn = connect_db()
-        cursor = conn.cursor()
-        cursor.execute("SELECT team_id, player_id, game_id, points, created_at, comment FROM total_scores_log")
-        rows = cursor.fetchall()
-        conn.close()
+        if conn is None:
+            return
+        try:
+            cursor = conn.cursor()
+            cursor.execute("INSERT INTO teams (name, comp_id, created_at, score) VALUES (%s, 1, NOW(), 0)", (team_name,))
+            conn.commit()
+            conn.close()
+            self.fetch_teams()
+        except mysql.connector.Error as e:
+            QMessageBox.critical(self, "Database Error", str(e))
+    
+    def fetch_scores(self):
+        conn = connect_db()
+        if conn is None:
+            return
+        try:
+            cursor = conn.cursor()
+            cursor.execute("SELECT team_id, player_id, game_id, points, created_at, comment FROM total_scores_logq")
+            rows = cursor.fetchall()
+            conn.close()
+            
+            self.score_table.setRowCount(len(rows))
+            for row_idx, row in enumerate(rows):
+                for col_idx, data in enumerate(row):
+                    self.score_table.setItem(row_idx, col_idx, QTableWidgetItem(str(data)))
+        except mysql.connector.Error as e:
+            QMessageBox.critical(self, "Database Error", str(e))
 
-        for i in score_table.get_children():
-            score_table.delete(i)
-
-        for row in rows:
-            score_table.insert("", "end", values=row)
-    except mysql.connector.Error as e:
-        messagebox.showerror("Database Error", str(e))
-
-root = tk.Tk()
-root.title("Competition DB Manager")
-root.geometry("800x500")
-
-notebook = ttk.Notebook(root)
-notebook.pack(expand=True, fill="both")
-
-# Teams Tab
-team_frame = ttk.Frame(notebook)
-notebook.add(team_frame, text="Teams")
-
-tk.Label(team_frame, text="Team Name:").pack()
-team_entry = tk.Entry(team_frame)
-team_entry.pack()
-
-tk.Button(team_frame, text="Add Team", command=add_team).pack()
-tk.Button(team_frame, text="Load Teams", command=fetch_teams).pack()
-
-team_columns = ("id", "name", "comp_id", "score")
-team_table = ttk.Treeview(team_frame, columns=team_columns, show="headings")
-
-for col in team_columns:
-    team_table.heading(col, text=col.upper())
-    team_table.column(col, width=100, anchor="center")
-
-team_table.pack(fill="both", expand=True)
-
-# Scores Tab
-score_frame = ttk.Frame(notebook)
-notebook.add(score_frame, text="Scores")
-
-tk.Button(score_frame, text="Load Scores", command=fetch_scores).pack()
-
-score_columns = ("team_id", "player_id", "game_id", "points", "created_at", "comment")
-score_table = ttk.Treeview(score_frame, columns=score_columns, show="headings")
-
-for col in score_columns:
-    score_table.heading(col, text=col.upper())
-    score_table.column(col, width=120, anchor="center")
-
-score_table.pack(fill="both", expand=True)
-
-root.mainloop()
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    window = CompetitionDBApp()
+    window.show()
+    sys.exit(app.exec())
