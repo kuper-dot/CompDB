@@ -3,19 +3,21 @@ from tkinter import ttk, messagebox, simpledialog
 import mysql.connector
 
 class LoginDialog(simpledialog.Dialog):
+    """Dialog for user login to the database."""
     def __init__(self, parent):
         self.credentials = None
         super().__init__(parent, title="Login to Database")
 
     def body(self, master):
+        """Create input fields for database credentials."""
         tk.Label(master, text="Host:").grid(row=0, column=0, sticky="w")
         self.host_input = tk.Entry(master)
-        self.host_input.insert(0, "192.168.0.113")
+        self.host_input.insert(0, "192.168.0.113")  # Default host
         self.host_input.grid(row=0, column=1)
 
         tk.Label(master, text="Port:").grid(row=1, column=0, sticky="w")
         self.port_input = tk.Entry(master)
-        self.port_input.insert(0, "3306")
+        self.port_input.insert(0, "3306")  # Default port
         self.port_input.grid(row=1, column=1)
 
         tk.Label(master, text="Username:").grid(row=2, column=0, sticky="w")
@@ -27,18 +29,19 @@ class LoginDialog(simpledialog.Dialog):
         self.password_input.grid(row=3, column=1)
 
     def apply(self):
+        """Save credentials and validate them."""
         self.credentials = {
             "host": self.host_input.get(),
             "port": int(self.port_input.get()),
             "user": self.user_input.get(),
             "password": self.password_input.get()
         }
-        # Validate credentials
         if not self.validate_credentials():
             self.credentials = None  # Reset credentials if validation fails
             self.focus_set()  # Keep the dialog open and refocus on it
 
     def validate_credentials(self):
+        """Validate database credentials by attempting a connection."""
         try:
             conn = mysql.connector.connect(
                 host=self.credentials["host"],
@@ -53,6 +56,7 @@ class LoginDialog(simpledialog.Dialog):
             return False
 
 def connect_db(credentials):
+    """Establish a connection to the database using the provided credentials."""
     try:
         return mysql.connector.connect(
             host=credentials["host"],
@@ -66,13 +70,15 @@ def connect_db(credentials):
         return None
 
 class CompetitionDBApp(tk.Tk):
+    """Main application for managing competition data."""
     def __init__(self, db_credentials):
         super().__init__()
         self.db_credentials = db_credentials
         self.selected_competition_id = None  # Track the selected competition
         self.title("Competition DB Manager")
-        self.geometry("1000x600")  # Increased window size
+        self.geometry("1000x600")  # Set window size
 
+        # Create tabs for different sections
         self.tabs = ttk.Notebook(self)
         self.tabs.pack(expand=1, fill="both")
 
@@ -80,24 +86,26 @@ class CompetitionDBApp(tk.Tk):
         self.score_tab = ttk.Frame(self.tabs)
         self.games_tab = ttk.Frame(self.tabs)
         self.players_tab = ttk.Frame(self.tabs)
-        self.competitions_tab = ttk.Frame(self.tabs)  # New Competitions tab
+        self.competitions_tab = ttk.Frame(self.tabs)
 
         self.tabs.add(self.team_tab, text="Teams")
         self.tabs.add(self.score_tab, text="Scores")
         self.tabs.add(self.games_tab, text="Games")
         self.tabs.add(self.players_tab, text="Players")
-        self.tabs.add(self.competitions_tab, text="Competitions")  # Add Competitions tab
+        self.tabs.add(self.competitions_tab, text="Competitions")
 
-        self.init_competition_selector()  # Initialize competition selector
+        # Initialize UI components
+        self.init_competition_selector()
         self.init_team_tab()
         self.init_score_tab()
         self.init_games_tab()
         self.init_players_tab()
-        self.init_competitions_tab()  # Initialize Competitions tab
+        self.init_competitions_tab()
 
-        self.clear_competition_filter()  # Apply clear filter logic on startup
+        self.clear_competition_filter()  # Load all data on startup
 
     def init_competition_selector(self):
+        """Create a dropdown to select a competition and a button to clear the filter."""
         frame = ttk.Frame(self)
         frame.pack(fill="x", pady=5)
 
@@ -108,10 +116,11 @@ class CompetitionDBApp(tk.Tk):
 
         self.refresh_competition_list()
 
-        self.clear_filter_btn = ttk.Button(frame, text="Clear Filter / Refresh", command=self.clear_competition_filter)
+        self.clear_filter_btn = ttk.Button(frame, text="Clear Filter", command=self.clear_competition_filter)
         self.clear_filter_btn.pack(side="left", padx=5)
 
     def refresh_competition_list(self):
+        """Populate the competition dropdown with data from the database."""
         conn = connect_db(self.db_credentials)
         if conn:
             cursor = conn.cursor()
@@ -121,10 +130,23 @@ class CompetitionDBApp(tk.Tk):
             self.competition_dropdown["values"] = [f"{comp[0]} - {comp[1]}" for comp in competitions]
 
     def clear_competition_filter(self):
+        """Clear the competition filter and display all data."""
         self.selected_competition_id = None
         self.competition_dropdown.set("")  # Clear the dropdown selection
+        self.fetch_all_data()
 
-        # Fetch all data for all tabs
+    def fetch_all_data(self):
+        """Fetch and refresh data for all tabs."""
+        if self.selected_competition_id:
+            self.fetch_teams()
+            self.fetch_scores()
+            self.fetch_games()
+            self.fetch_players()
+        else:
+            self.load_all_data()
+
+    def load_all_data(self):
+        """Load all data for all tabs when no competition is selected."""
         conn = connect_db(self.db_credentials)
         if conn:
             try:
@@ -195,15 +217,14 @@ class CompetitionDBApp(tk.Tk):
                 messagebox.showerror("Database Error", str(e))
 
     def on_competition_selected(self, event):
+        """Handle competition selection from the dropdown."""
         selected = self.competition_dropdown.get()
         if selected:
             self.selected_competition_id = int(selected.split(" - ")[0])  # Extract competition ID
-            self.fetch_teams()
-            self.fetch_scores()
-            self.fetch_games()
-            self.fetch_players()
+            self.fetch_all_data()
 
     def init_team_tab(self):
+        """Initialize the Teams tab with input fields and a table."""
         frame = ttk.Frame(self.team_tab)
         frame.pack(fill="both", expand=True)
 
@@ -223,17 +244,8 @@ class CompetitionDBApp(tk.Tk):
         self.team_table.heading("Score", text="Score")
         self.team_table.pack(fill="both", expand=True)
 
-    def fetch_all_data(self):
-        """Fetch and refresh data for all tabs."""
-        if self.selected_competition_id:
-            self.fetch_teams()
-            self.fetch_scores()
-            self.fetch_games()
-            self.fetch_players()
-        else:
-            self.clear_competition_filter()
-
     def delete_team(self):
+        """Delete the selected team from the database."""
         selected_item = self.team_table.selection()
         if not selected_item:
             messagebox.showwarning("Selection Error", "Please select a team to delete.")
@@ -252,6 +264,7 @@ class CompetitionDBApp(tk.Tk):
                 messagebox.showerror("Database Error", str(e))
 
     def init_score_tab(self):
+        """Initialize the Scores tab with input fields and a table."""
         frame = ttk.Frame(self.score_tab)
         frame.pack(fill="both", expand=True)
 
@@ -282,6 +295,7 @@ class CompetitionDBApp(tk.Tk):
         self.score_table.column("Comment", width=250)
 
     def delete_score(self):
+        """Delete the selected score from the database."""
         selected_item = self.score_table.selection()
         if not selected_item:
             messagebox.showwarning("Selection Error", "Please select a score to delete.")
@@ -300,6 +314,7 @@ class CompetitionDBApp(tk.Tk):
                 messagebox.showerror("Database Error", str(e))
 
     def init_games_tab(self):
+        """Initialize the Games tab with input fields and a table."""
         frame = ttk.Frame(self.games_tab)
         frame.pack(fill="both", expand=True)
 
@@ -322,6 +337,7 @@ class CompetitionDBApp(tk.Tk):
         self.games_table.pack(fill="both", expand=True)
 
     def delete_game(self):
+        """Delete the selected game from the database."""
         selected_item = self.games_table.selection()
         if not selected_item:
             messagebox.showwarning("Selection Error", "Please select a game to delete.")
@@ -340,6 +356,7 @@ class CompetitionDBApp(tk.Tk):
                 messagebox.showerror("Database Error", str(e))
 
     def init_players_tab(self):
+        """Initialize the Players tab with input fields and a table."""
         frame = ttk.Frame(self.players_tab)
         frame.pack(fill="both", expand=True)
 
@@ -360,6 +377,7 @@ class CompetitionDBApp(tk.Tk):
         self.players_table.pack(fill="both", expand=True)
 
     def delete_player(self):
+        """Delete the selected player from the database."""
         selected_item = self.players_table.selection()
         if not selected_item:
             messagebox.showwarning("Selection Error", "Please select a player to delete.")
@@ -378,6 +396,7 @@ class CompetitionDBApp(tk.Tk):
                 messagebox.showerror("Database Error", str(e))
 
     def init_competitions_tab(self):
+        """Initialize the Competitions tab with input fields and a table."""
         frame = ttk.Frame(self.competitions_tab)
         frame.pack(fill="both", expand=True)
 
@@ -399,6 +418,7 @@ class CompetitionDBApp(tk.Tk):
         self.competitions_table.pack(fill="both", expand=True)
 
     def delete_competition(self):
+        """Delete the selected competition from the database."""
         selected_item = self.competitions_table.selection()
         if not selected_item:
             messagebox.showwarning("Selection Error", "Please select a competition to delete.")
@@ -438,6 +458,7 @@ class CompetitionDBApp(tk.Tk):
                 messagebox.showerror("Database Error", str(e))
 
     def fetch_teams(self):
+        """Fetch and display teams for the selected competition."""
         conn = connect_db(self.db_credentials)
         if conn is None or self.selected_competition_id is None:
             return
@@ -460,6 +481,7 @@ class CompetitionDBApp(tk.Tk):
             messagebox.showerror("Database Error", str(e))
 
     def add_team(self):
+        """Add a new team to the database."""
         def submit_team():
             team_name = team_name_input.get().strip()
             selected_comp = competition_dropdown.get()
@@ -506,6 +528,7 @@ class CompetitionDBApp(tk.Tk):
         submit_btn.grid(row=2, column=0, columnspan=2)
 
     def fetch_scores(self):
+        """Fetch and display scores for the selected competition."""
         conn = connect_db(self.db_credentials)
         if conn is None or self.selected_competition_id is None:
             return
@@ -537,6 +560,7 @@ class CompetitionDBApp(tk.Tk):
             messagebox.showerror("Database Error", str(e))
 
     def fetch_games(self):
+        """Fetch and display games for the selected competition."""
         conn = connect_db(self.db_credentials)
         if conn is None or self.selected_competition_id is None:
             return
@@ -562,6 +586,7 @@ class CompetitionDBApp(tk.Tk):
             messagebox.showerror("Database Error", str(e))
 
     def fetch_players(self):
+        """Fetch and display players for the selected competition."""
         conn = connect_db(self.db_credentials)
         if conn is None or self.selected_competition_id is None:
             return
@@ -584,6 +609,7 @@ class CompetitionDBApp(tk.Tk):
             messagebox.showerror("Database Error", str(e))
 
     def fetch_competitions(self):
+        """Fetch and display all competitions."""
         conn = connect_db(self.db_credentials)
         if conn is None:
             return
@@ -604,6 +630,7 @@ class CompetitionDBApp(tk.Tk):
             messagebox.showerror("Database Error", str(e))
 
     def add_score(self):
+        """Add a new score to the database."""
         def update_team_game_status(event):
             game_name = game_dropdown.get()
             if not game_name:
@@ -723,6 +750,7 @@ class CompetitionDBApp(tk.Tk):
         submit_btn.grid(row=5, column=0, columnspan=2)
 
     def add_game(self):
+        """Add a new game to the database."""
         def submit_game():
             comp_name = comp_dropdown.get()
             name = name_input.get().strip()
@@ -784,6 +812,7 @@ class CompetitionDBApp(tk.Tk):
         submit_btn.grid(row=4, column=0, columnspan=2)
 
     def add_player(self):
+        """Add a new player to the database."""
         def submit_player():
             team_name = team_dropdown.get()
             player_name = player_name_input.get().strip()
@@ -833,6 +862,7 @@ class CompetitionDBApp(tk.Tk):
         submit_btn.grid(row=2, column=0, columnspan=2)
 
     def add_competition(self):
+        """Add a new competition to the database."""
         def submit_competition():
             name = name_input.get().strip()
             start_date = start_date_input.get().strip()
@@ -878,9 +908,13 @@ class CompetitionDBApp(tk.Tk):
         submit_btn.grid(row=3, column=0, columnspan=2)
 
 if __name__ == "__main__":
-    while True:  # Keep showing the login dialog until valid credentials are provided
+    while True:  # Keep showing the login dialog until valid credentials are provided or the user cancels
         login_dialog = LoginDialog(None)  # Pass None as the parent for the dialog
         if login_dialog.credentials:
             app = CompetitionDBApp(login_dialog.credentials)
             app.mainloop()
             break
+        elif login_dialog.credentials is None and not messagebox.askretrycancel(
+            "Login Failed", "No valid credentials provided. Do you want to retry?"
+        ):
+            exit()
